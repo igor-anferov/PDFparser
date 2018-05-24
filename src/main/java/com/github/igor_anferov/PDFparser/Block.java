@@ -1,3 +1,5 @@
+package com.github.igor_anferov.PDFparser;
+
 import javafx.util.Pair;
 
 import java.awt.*;
@@ -15,10 +17,12 @@ public class Block {
         Numbered,
         NumberedLabel,
         PlainText,
+        Formula,
     }
     class BlockType {
         Type type;
         List<String> number;
+        String delim;
         Comparator<String> cmp;
         int numberType;
         String labelPrefix;
@@ -43,6 +47,10 @@ public class Block {
         type = new BlockType();
         sons = new ArrayList<>();
         this.renderer = renderer;
+    }
+
+    public String toString() {
+        return lines.stream().map(Line::toString).collect(Collectors.joining("\n"));
     }
 
     public int getFirstPage()
@@ -72,6 +80,16 @@ public class Block {
         for (Line line : lines)
             if (line.xMax() > res)
                 res = line.xMax();
+        return res;
+    }
+
+    public float getEps()
+    {
+        assert (!lines.isEmpty());
+        float res = lines.get(0).getEps();
+        for (Line line : lines)
+            if (line.getEps() > res)
+                res = line.getEps();
         return res;
     }
 
@@ -249,7 +267,7 @@ public class Block {
         }
     }
 
-    static Pattern labelPrefix = Pattern.compile("^\\s*([^\\d\\s]{1,20}(?>\\s+[^\\d\\s]{1,20}){0,3})\\s*\\d", Pattern.UNICODE_CHARACTER_CLASS);
+    static Pattern labelPrefix = Pattern.compile("^\\s*((?:\\p{Z}?(?>[\\p{L}\\p{M}.]{1,20})){1,3})\\s*\\d", Pattern.UNICODE_CHARACTER_CLASS);
     static private List<Pair<Pattern, Comparator<String>>> numbered = new ArrayList<>();
     static {
         numbered.add(new Pair<>(Pattern.compile("^\\s*(\\d+(?:(?<delim>[\\pP\\pS]+)(?:\\d+(?:\\k<delim>\\d+)*)?)?)", Pattern.UNICODE_CHARACTER_CLASS),
@@ -267,11 +285,37 @@ public class Block {
             Matcher m = numbered.get(i).getKey().matcher(forSearch);
             if (!m.lookingAt())
                 continue;
-            type.number = Arrays.stream(m.group(1).split("\\.")).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+            type.delim = m.group("delim");
+            if (type.delim == null) type.delim = "";
+            type.number = Arrays.stream(m.group(1).split(type.delim == null ? "\n" : Pattern.quote(type.delim))).filter(s -> !s.isEmpty()).collect(Collectors.toList());
             type.type = type.labelPrefix == null ? Type.Numbered : Type.NumberedLabel;
             type.cmp = numbered.get(i).getValue();
             type.numberType = i;
             return;
         }
+    }
+
+    public String getHeaders() {
+        StringBuilder res = new StringBuilder();
+        if (sons != null && !sons.isEmpty()) {
+            res.append(toString());
+            for (String s : sons.stream().map(Block::getHeaders).collect(Collectors.joining("\n")).split("\n"))
+                if (!s.isEmpty())
+                    res = res.append("\n    ").append(s);
+        }
+        return res.toString();
+    }
+
+    public boolean looksLikeFormula()
+    {
+        int y = 0;
+        int n = 0;
+        for (Line line : lines) {
+            if (line.looksLikeFormula())
+                y++;
+            else
+                n++;
+        }
+        return y > n;
     }
 }

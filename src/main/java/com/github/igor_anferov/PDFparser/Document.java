@@ -1,15 +1,23 @@
+package com.github.igor_anferov.PDFparser;
+
+import com.sun.org.apache.xpath.internal.operations.Equals;
 import javafx.util.Pair;
 import org.lionsoul.jcseg.util.Sort;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.lang.Math.abs;
-import static java.lang.StrictMath.min;
-import static java.lang.StrictMath.max;
+import static java.lang.Math.min;
+import static java.lang.Math.max;
 
 public class Document {
+    public String name;
     public List<Block> blocks;
     public List<Integer> eopBlocks;
+    public float xMin, xMax, yMin, yMax;
+    public List<Block> hierarchy;
+    Map<Style, Set<Block>> hist;
 
     class BlocksComparator implements Comparator<Block> {
         @Override
@@ -23,11 +31,30 @@ public class Document {
         }
     }
 
-    Document()
+    Document(String name)
     {
+        this.name = name;
         blocks = new ArrayList<>();
         eopBlocks = new ArrayList<>();
+        hist = new TreeMap<>();
         eopBlocks.add(-1);
+    }
+
+    public void fillPositions()
+    {
+        xMin = yMin = Float.MAX_VALUE;
+        xMax = yMax = Float.MIN_VALUE;
+        for (Block block : blocks)
+            for (Line line : block.lines) {
+                if (line.yMax() > yMax)
+                    yMax = line.yMax();
+                if (line.xMax() > xMax)
+                    xMax = line.xMax();
+                if (line.yMin() < yMin)
+                    yMin = line.yMin();
+                if (line.xMin() < xMin)
+                    xMin = line.xMin();
+            }
     }
 
     public void Append(Block b)
@@ -168,7 +195,7 @@ public class Document {
             if (blocks.get(i).getFirstLine().GetAlignWith(blocks.get(i+1).getFirstLine()) != Style.AlignType.Unknown)
                 continue;
             if (abs(blocks.get(i).lines.get(0).xMin() - getMedianFirstLinePos(i, 5))
-                        > max(blocks.get(i).lines.get(0).Width(), blocks.get(i+1).getMaxLineWidth()) / 50)
+                        > max(blocks.get(i).lines.get(0).Width(), blocks.get(i+1).getMaxLineWidth()) / 80)
                 continue;
             if (!blocks.get(i).getMedianStyle().almostEquals(blocks.get(i+1).getMedianStyle()))
                 continue;
@@ -181,10 +208,15 @@ public class Document {
 
     public void mergeEopBlocks()
     {
+        float vertEps = (yMax - yMin) / 10;
         for (int i = 0; i < blocks.size() - 1; i++) {
             if (!blocks.get(i).endOfPage)
                 continue;
             if (!blocks.get(i).getMedianStyle().almostEquals(blocks.get(i+1).getMedianStyle()))
+                continue;
+            if (abs(blocks.get(i).getLastLine().yMax() - yMax) > vertEps)
+                continue;
+            if (abs(blocks.get(i+1).getFirstLine().yMin() - yMin) > vertEps)
                 continue;
             if (       blocks.get(i).alignment != Style.AlignType.Unknown
                     && blocks.get(i).alignment != Style.AlignType.Multiple
@@ -202,7 +234,7 @@ public class Document {
                     || blocks.get(i+1).alignment == Style.AlignType.Multiple)
                     && blocks.get(i).lines.size() == 1
                     && abs(blocks.get(i).getFirstLine().xMin() - getMedianFirstLinePos(i, 5))
-                               < max(blocks.get(i).getFirstLine().Width(), blocks.get(i+1).getMaxLineWidth()) / 50
+                               < max(blocks.get(i).getFirstLine().Width(), blocks.get(i+1).getMaxLineWidth()) / 80
                     && blocks.get(i+1).getFirstLine().GetAlignWith(blocks.get(i).getLastLine()) == Style.AlignType.Right
                     ||
                        blocks.get(i+1).alignment != Style.AlignType.Unknown
@@ -238,7 +270,7 @@ public class Document {
             }
             float selfXmin = blocks.get(i).xMin();
             float selfXmax = blocks.get(i).xMax();
-            float eps = max(abs(selfXmax - selfXmin), abs(xMax - xMin)) / 60;
+            float eps = blocks.get(i).getEps();
             if (blocks.get(i).lines.size() == 1 || (blocks.get(i).lines.size() <= 3 && blocks.get(i).alignment == Style.AlignType.Full)) {
                 if (abs((selfXmin - xMin) - (xMax - selfXmax)) < eps)
                     blocks.get(i).alignment = Style.AlignType.Center;
@@ -270,14 +302,13 @@ public class Document {
             block.MergeLines();
     }
 
-    public Map<Style, Set<Block>> GetStylesHist()
+    public void FillStylesHist()
     {
-        Map<Style, Set<Block>> hist = new TreeMap<>();
         Map<Style, Set<Block>> histMultiAlign = new TreeMap<>();
         for (Block block : blocks) {
             Style style = block.getMedianStyle();
             style.align = block.alignment;
-            Map<Style, Set<Block>> h = style.align == Style.AlignType.Multiple ? histMultiAlign : hist;
+            Map<Style, Set<Block>> h = (style.align == Style.AlignType.Multiple || style.align == Style.AlignType.Unknown) ? histMultiAlign : hist;
             if (!h.containsKey(style))
                 h.put(style, new TreeSet<Block>(new BlocksComparator()));
             h.get(style).add(block);
@@ -290,13 +321,99 @@ public class Document {
             }
             hist.merge(h.isEmpty() ? styleSetEntry.getKey() : h.lastEntry().getValue(), styleSetEntry.getValue(), (a, b) -> {a.addAll(b); return a;});
         }
+    }
 
-        return hist;
+    private static boolean checkLabelNumeration(List<Block.BlockType> l)
+    {
+        if (l.stream().map(b -> b.type).distinct().count() > 1)
+            return false;
+        if (l.stream().map(b -> b.numberType).distinct().count() > 1)
+            return false;
+        if (l.stream().map(b -> b.number.size()).distinct().count() > 1)
+            return false;
+        for (int i = 0; i < l.size() - 1; i++) {
+            for (int i1 = 0; i1 < l.get(i).number.size(); i1++)
+                if (l.get(i).cmp.compare(l.get(i).number.get(i1), l.get(i+1).number.get(i1)) >= 0)
+                    return false;
+        }
+        return true;
     }
 
     public void FillBlocksTypes()
     {
         for (Block block : blocks)
             block.FillType();
+        Map<Pair<String, String>, List<Block>> labels = new TreeMap<>((a, b) -> {
+            if (a.getKey().compareTo(b.getKey()) != 0)
+                return a.getKey().compareTo(b.getKey());
+            return a.getValue().compareTo(b.getValue());
+        });
+        for (Block block : blocks)
+            if (block.type.type == Block.Type.NumberedLabel)
+                labels.computeIfAbsent(new Pair<>(block.type.labelPrefix, block.type.delim), s -> new ArrayList<>()).add(block);
+        for (Map.Entry<Pair<String, String>, List<Block>> entry : labels.entrySet()) {
+            if (entry.getKey().getKey().contains("§")
+                    || !checkLabelNumeration(entry.getValue().stream().map(b -> b.type).collect(Collectors.toList())))
+                entry.getValue().forEach(block -> block.type.type = entry.getKey().getKey().contains("§") ? Block.Type.Numbered : Block.Type.PlainText);
+        }
+        for (Block block : blocks) {
+            if (block.looksLikeFormula())
+                block.type.type = Block.Type.Formula;
+        }
+    }
+
+    private List<Block> getHierarchy(List<Block> flat)
+    {
+        for (Map.Entry<Style, Set<Block>> styleSetEntry : hist.entrySet()) {
+            if ( Arrays.asList(
+                    Style.AlignType.Unknown,
+                    Style.AlignType.Right,
+                    Style.AlignType.Multiple
+                 ).contains(styleSetEntry.getKey().align))
+                continue;
+            List<Integer> idxs = new ArrayList<>();
+            boolean hasFormula = false;
+            for (Block block : styleSetEntry.getValue()) {
+                if (flat.contains(block))
+                    idxs.add(flat.indexOf(block));
+                if (block.type.type == Block.Type.NumberedLabel && !block.type.labelPrefix.contains("§"))
+                    return flat;
+                if (block.type.type == Block.Type.Formula)
+                    hasFormula = true;
+            }
+            if (idxs.size() < 2 || hasFormula)
+                continue;
+            List<Block> res = new ArrayList<>();
+            res.addAll(getHierarchy(new ArrayList<>(flat.subList(0, idxs.get(0)))));
+
+            for (int i = 0; i < idxs.size(); i++) {
+                if (flat.size() > idxs.get(i) + 1) {
+                    int toIdx = i + 1 == idxs.size() ? flat.size() : idxs.get(i + 1);
+                    flat.get(idxs.get(i)).sons = getHierarchy(new ArrayList<>(flat.subList(idxs.get(i) + 1, toIdx)));
+                }
+                res.add(flat.get(idxs.get(i)));
+            }
+            if (res.stream().map(block -> block.sons.size()).filter(integer -> integer > 0).count() > 1)
+                return res;
+            else
+                flat.forEach(block -> block.sons.clear());
+        }
+        return flat;
+    }
+
+    public void fillHierarchy()
+    {
+        hierarchy = getHierarchy(blocks);
+    }
+
+    public String getHeaders() {
+        Block tmp = new Block(null) {
+            @Override
+            public String toString() {
+                return name;
+            }
+        };
+        tmp.sons = hierarchy;
+        return tmp.getHeaders();
     }
 }

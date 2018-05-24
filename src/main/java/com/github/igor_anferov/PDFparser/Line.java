@@ -1,3 +1,5 @@
+package com.github.igor_anferov.PDFparser;
+
 import javafx.util.Pair;
 import org.apache.commons.lang3.StringUtils;
 
@@ -13,6 +15,10 @@ public class Line {
     public String text;
     public List<Style> styles;
     public List<OnPagePosition> onPagePositions;
+
+    public String toString() {
+        return text;
+    }
 
     static private Pattern noHeadingAndTrailingSpaces = Pattern.compile("\\S+(?:\\s+\\S+)*");
 
@@ -175,6 +181,15 @@ public class Line {
         return res;
     }
 
+    public float getEps() {
+        float eps = Float.MAX_VALUE;
+        for (OnPagePosition onPagePosition : onPagePositions) {
+            if (onPagePosition.xMax - onPagePosition.xMin < eps)
+                eps = onPagePosition.xMax - onPagePosition.xMin;
+        }
+        return min(eps, Width() / 80f);
+    }
+
     public float Width()
     {
         return xMax() - xMin();
@@ -317,5 +332,19 @@ public class Line {
                     return false;
         }
         return true;
+    }
+
+    static Pattern formulaChars = Pattern.compile("[\\p{Sm}\\p{N}\\p{P}]", Pattern.UNICODE_CHARACTER_CLASS);
+
+    public boolean looksLikeFormula()
+    {
+
+        Matcher m = formulaChars.matcher(text);
+        int count = 0;
+        while (m.find())
+            count++;
+        if (count > text.length() / 3)
+            return true;
+        return false;
     }
 }

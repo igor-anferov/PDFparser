@@ -1,19 +1,14 @@
+package com.github.igor_anferov.PDFparser;
+
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 
-import javax.imageio.ImageIO;
-import java.awt.image.RenderedImage;
-import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static java.lang.Math.max;
-import static java.lang.Math.round;
 
 public class PDFextractor extends PDFTextStripper {
     String name;
@@ -30,12 +25,14 @@ public class PDFextractor extends PDFTextStripper {
     public Document GetDocument()
     {
         document.RemoveHeadersAndFooters();
+        document.fillPositions();
         document.mergeFirstLinesWithRest();
         document.FillBlocksAlignments();
         document.mergeEopBlocks();
         document.MergeLinesInsideBlocks();
         document.FillBlocksTypes();
-        Map<Style, Set<Block>> hist = document.GetStylesHist();
+        document.FillStylesHist();
+        document.fillHierarchy();
         return document;
     }
 
@@ -44,7 +41,7 @@ public class PDFextractor extends PDFTextStripper {
     {
         renderer = new RegionPDFRenderer(doc, 288);
         name = doc.getDocumentInformation().getTitle();
-        document = new Document();
+        document = new Document(name);
         super.writeText(doc, outputStream);
     }
 

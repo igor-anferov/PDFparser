@@ -1,11 +1,16 @@
+package com.github.igor_anferov.PDFparser;
+
+import com.github.igor_anferov.PDFOutlineExtractor.Header;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.commons.io.output.NullWriter;
 
-import javax.imageio.ImageIO;
-import java.awt.geom.Rectangle2D;
-import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+
+import static java.lang.Math.max;
 
 public class Main {
     public static void main( String[] args ) throws IOException
@@ -20,12 +25,9 @@ public class Main {
             System.out.println("Have no permissions to extract PDF's content");
             return;
         }
-//        RegionPDFRenderer renderer = new RegionPDFRenderer(document, 288);
-//        RenderedImage r = renderer.renderRect(0, new Rectangle2D.Float(56.664f, 285.57f, 102.99f-56.664f, 415.79f-285.57f));
-//        ImageIO.write(r, "png", new File("/Users/Igor/Downloads/output/test.png"));
-
         PDFextractor extractor = new PDFextractor();
         extractor.writeText(document, new NullWriter());
-        extractor.GetDocument();
+        Document doc = extractor.GetDocument();
+        System.out.println(doc.getHeaders());
     }
 }

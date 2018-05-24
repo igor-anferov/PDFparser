@@ -1,3 +1,5 @@
+package com.github.igor_anferov.PDFparser;
+
 public class OnPagePosition implements Comparable<OnPagePosition> {
     public int page;
     public float xMin, xMax, yMin, yMax;
