@@ -3,6 +3,10 @@ package com.github.igor_anferov.PDFparser;
 import javafx.util.Pair;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlTransient;
+import javax.xml.bind.annotation.XmlValue;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,8 +16,11 @@ import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 public class Line {
+    @XmlValue
     public String text;
+    @XmlTransient
     public List<Style> styles;
+    @XmlTransient
     public List<OnPagePosition> onPagePositions;
 
     public String toString() {

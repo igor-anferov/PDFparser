@@ -2,6 +2,7 @@ package com.github.igor_anferov.PDFparser;
 
 import javafx.util.Pair;
 
+import javax.xml.bind.annotation.*;
 import java.awt.*;
 import java.awt.image.RenderedImage;
 import java.io.IOException;
@@ -19,12 +20,18 @@ public class Block {
         PlainText,
         Formula,
     }
-    class BlockType {
+    static class BlockType {
+        @XmlValue
         Type type;
+        @XmlTransient
         List<String> number;
+        @XmlTransient
         String delim;
+        @XmlTransient
         Comparator<String> cmp;
+        @XmlTransient
         int numberType;
+        @XmlTransient
         String labelPrefix;
 
         BlockType()
@@ -34,11 +41,18 @@ public class Block {
         }
     }
 
+    @XmlAttribute
     BlockType type;
+    @XmlElement(name = "text")
     public List<Line> lines;
+    @XmlTransient
     public boolean endOfPage = false;
+    @XmlAttribute
     public Style.AlignType alignment = Style.AlignType.Unknown;
+    @XmlTransient
     private RegionPDFRenderer renderer;
+    @XmlElementWrapper(name = "subBlocks")
+    @XmlElement(name = "subBlock")
     public List<Block> sons;
 
     Block(RegionPDFRenderer renderer)

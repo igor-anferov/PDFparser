@@ -4,6 +4,7 @@ import com.sun.org.apache.xpath.internal.operations.Equals;
 import javafx.util.Pair;
 import org.lionsoul.jcseg.util.Sort;
 
+import javax.xml.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -11,12 +12,19 @@ import static java.lang.Math.abs;
 import static java.lang.Math.min;
 import static java.lang.Math.max;
 
+@XmlRootElement
 public class Document {
     public String name;
+    @XmlTransient
     public List<Block> blocks;
+    @XmlTransient
     public List<Integer> eopBlocks;
+    @XmlTransient
     public float xMin, xMax, yMin, yMax;
+    @XmlElementWrapper(name = "blocks")
+    @XmlElement(name = "block")
     public List<Block> hierarchy;
+    @XmlTransient
     Map<Style, Set<Block>> hist;
 
     class BlocksComparator implements Comparator<Block> {
@@ -30,6 +38,8 @@ public class Document {
                 return 1;
         }
     }
+
+    public Document() {}
 
     Document(String name)
     {
