@@ -19,6 +19,7 @@ public class Block {
         NumberedLabel,
         PlainText,
         Formula,
+        Table,
     }
     static class BlockType {
         @XmlValue
@@ -50,7 +51,7 @@ public class Block {
     @XmlAttribute
     public Style.AlignType alignment = Style.AlignType.Unknown;
     @XmlTransient
-    private RegionPDFRenderer renderer;
+    protected RegionPDFRenderer renderer;
     @XmlElementWrapper(name = "subBlocks")
     @XmlElement(name = "subBlock")
     public List<Block> sons;
@@ -95,6 +96,16 @@ public class Block {
             if (line.xMax() > res)
                 res = line.xMax();
         return res;
+    }
+
+    public float Width()
+    {
+        return xMax() - xMin();
+    }
+
+    public boolean VerticallyIntersect(Block other)
+    {
+        return !(xMax() <= other.xMin()) && !(other.xMax() <= xMin());
     }
 
     public float getEps()
@@ -331,5 +342,10 @@ public class Block {
                 n++;
         }
         return y > n;
+    }
+
+    public boolean PlacedBefore(Block other)
+    {
+        return lines.get(lines.size()-1).PlacedBefore(other.lines.get(0));
     }
 }

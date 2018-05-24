@@ -32,6 +32,7 @@ public class PDFextractor extends PDFTextStripper {
         document.MergeLinesInsideBlocks();
         document.FillBlocksTypes();
         document.FillStylesHist();
+        document.findTables();
         document.fillHierarchy();
         return document;
     }

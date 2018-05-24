@@ -67,6 +67,16 @@ public class Document {
             }
     }
 
+    public float Width()
+    {
+        return xMax - xMin;
+    }
+
+    public float Height()
+    {
+        return yMax - yMin;
+    }
+
     public void Append(Block b)
     {
         blocks.add(b);
@@ -382,16 +392,16 @@ public class Document {
                  ).contains(styleSetEntry.getKey().align))
                 continue;
             List<Integer> idxs = new ArrayList<>();
-            boolean hasFormula = false;
+            boolean notHierarchical = false;
             for (Block block : styleSetEntry.getValue()) {
                 if (flat.contains(block))
                     idxs.add(flat.indexOf(block));
                 if (block.type.type == Block.Type.NumberedLabel && !block.type.labelPrefix.contains("§"))
                     return flat;
-                if (block.type.type == Block.Type.Formula)
-                    hasFormula = true;
+                if (Arrays.asList(Block.Type.Formula, Block.Type.Table).contains(block.type.type))
+                    notHierarchical = true;
             }
-            if (idxs.size() < 2 || hasFormula)
+            if (idxs.size() < 2 || notHierarchical)
                 continue;
             List<Block> res = new ArrayList<>();
             res.addAll(getHierarchy(new ArrayList<>(flat.subList(0, idxs.get(0)))));
@@ -425,5 +435,44 @@ public class Document {
         };
         tmp.sons = hierarchy;
         return tmp.getHeaders();
+    }
+
+    private void addTable(List<List<Block>> table)
+    {
+        int firstIdx = blocks.indexOf(table.get(0).get(0));
+        List<Block> lastRow = table.get(table.size() - 1);
+        int lastIdx = blocks.indexOf(lastRow.get(lastRow.size() - 1));
+        for (int i = firstIdx; i <= lastIdx; i++)
+            blocks.remove(firstIdx);
+        blocks.add(firstIdx, new Table(table));
+    }
+
+    public void findTables()
+    {
+        List<List<Block>> table = new ArrayList<>();
+        List<Block> line = new ArrayList<>();
+        for (int i = 1; i < blocks.size(); i++) {
+            if (blocks.get(i).type.type == Block.Type.Table || blocks.get(i-1).type.type == Block.Type.Table)
+                continue;
+            if (!blocks.get(i-1).PlacedBefore(blocks.get(i)) && !blocks.get(i).PlacedBefore(blocks.get(i-1))
+                    || (!line.isEmpty() || !table.isEmpty())
+                        && blocks.get(i-1).VerticallyIntersect(blocks.get(i))
+                        && blocks.get(i-1).Width() < Width() / 2
+                        && blocks.get(i).Width() < Width() / 2
+                        && abs(blocks.get(i-1).Width() - blocks.get(i).getFirstLine().Width()) < Width() / 3) {
+                if (line.isEmpty())
+                    line.add(blocks.get(i-1));
+                line.add(blocks.get(i));
+            } else {
+                if (!line.isEmpty()) {
+                    table.add(line);
+                    line = new ArrayList<>();
+                } else if (!table.isEmpty() && line.isEmpty()) {
+                    addTable(table);
+                    findTables();
+                    return;
+                }
+            }
+        }
     }
 }

@@ -215,7 +215,7 @@ public class Line {
 
     public boolean IsRightAlignedWith(Line other)
     {
-        float eps = max(Width(), other.Width()) / 80;
+        float eps = max(Width(), other.Width()) / 50;
         return abs(xMax() - other.xMax()) < eps;
     }
 
@@ -342,7 +342,6 @@ public class Line {
     }
 
     static Pattern formulaChars = Pattern.compile("[\\p{Sm}\\p{N}\\p{P}]", Pattern.UNICODE_CHARACTER_CLASS);
-
     public boolean looksLikeFormula()
     {
 
@@ -353,5 +352,10 @@ public class Line {
         if (count > text.length() / 3)
             return true;
         return false;
+    }
+
+    public boolean PlacedBefore(Line other)
+    {
+        return onPagePositions.get(onPagePositions.size()-1).PlacedBefore(other.onPagePositions.get(0));
     }
 }
